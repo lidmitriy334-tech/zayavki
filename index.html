@@ -211,6 +211,43 @@
 .price-grid > div{display:flex;align-items:center;gap:10px}
 .price-grid span{flex:1;font-size:14px;color:#3c4250}
 .price-grid input{width:110px;text-align:right;flex:none}
+.period-tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;padding-bottom:2px}
+.period-tabs::-webkit-scrollbar{display:none}
+.period{
+  padding:7px 13px;border-radius:999px;font-size:13px;font-weight:550;
+  background:#fafbfd;border:1px solid var(--line);color:var(--muted);
+  white-space:nowrap;transition:all .15s;
+}
+.period.on{background:var(--text);color:#fff;border-color:var(--text)}
+
+.stat-total{
+  background:linear-gradient(135deg,#2f6bff,#7aa2ff);
+  color:#fff;border-radius:14px;padding:18px 20px;
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px;
+}
+.stat-total-label{font-size:13.5px;opacity:.9;font-weight:500}
+.stat-total-num{font-size:36px;font-weight:700;letter-spacing:-1px;line-height:1}
+
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat-card{
+  background:#fafbfd;border:1px solid var(--line);border-radius:12px;
+  padding:12px 12px 14px;text-align:center;
+}
+.stat-card.tuna{background:#e8f1ff;border-color:#c9dcff}
+.stat-card.chicken{background:#fff4e0;border-color:#ffe0ab}
+.stat-card.crab{background:#ffe8e8;border-color:#ffc9c9}
+.stat-label{font-size:12px;font-weight:600;color:#4b5162;margin-bottom:6px}
+.stat-num{font-size:26px;font-weight:700;letter-spacing:-.6px;line-height:1}
+.stat-card.tuna .stat-num{color:#1d5fd8}
+.stat-card.chicken .stat-num{color:#a56100}
+.stat-card.crab .stat-num{color:#c92a2a}
+
+.stat-others-title{font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;margin-top:4px}
+.stat-others{background:#fafbfd;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.stat-other-row{display:flex;justify-content:space-between;padding:9px 13px;font-size:13.5px;border-bottom:1px solid var(--line)}
+.stat-other-row:last-child{border-bottom:none}
+.stat-other-row b{font-weight:600;color:#3c4250}
   @media(min-width:640px){
     .modal{align-items:center;padding:24px}
     .sheet{border-radius:20px;max-height:88vh}
@@ -229,6 +266,7 @@
       </div>
     </div>
     <div class="head-actions">
+      <button class="ghost" id="statsBtn" disabled aria-label="Статистика">📊</button>
       <button class="ghost" id="settingsBtn" disabled aria-label="Настройки">⚙</button>
       <button class="primary" id="newBtn" disabled>+ Заявка</button>
     </div>
@@ -302,6 +340,50 @@
     </div>
   </div>
 </div>
+<div class="modal" id="statsModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>Статистика онигири</h2>
+      <button class="x" id="closeStats" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="period-tabs" id="periodTabs">
+        <button class="period on" data-period="today">Сегодня</button>
+        <button class="period" data-period="week">7 дней</button>
+        <button class="period" data-period="month">30 дней</button>
+        <button class="period" data-period="all">Всё время</button>
+      </div>
+<div class="period-tabs" id="statusTabs">
+        <button class="period on" data-status="all">Все заявки</button>
+        <button class="period" data-status="new">Новые</button>
+        <button class="period" data-status="work">В работе</button>
+        <button class="period" data-status="done">Готово</button>
+      </div>
+
+      <div class="stat-total">
+        <div class="stat-total-label" id="statTotalLabel">Всего онигири</div>
+        <div class="stat-total-num" id="statTotal">0</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card tuna">
+          <div class="stat-label">🍙 Тунец</div>
+          <div class="stat-num" id="statTuna">0</div>
+        </div>
+        <div class="stat-card chicken">
+          <div class="stat-label">🍙 Курица</div>
+          <div class="stat-num" id="statChicken">0</div>
+        </div>
+        <div class="stat-card crab">
+          <div class="stat-label">🍙 Краб</div>
+          <div class="stat-num" id="statCrab">0</div>
+        </div>
+      </div>
+
+      <div id="statOthers"></div>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -325,6 +407,8 @@
   let editingId = null;
   let ready = false;
 let settings = { shops: [], prices: {} };
+let statPeriod = 'today';
+let statStatus = 'all';
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => (
     {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
@@ -374,7 +458,8 @@ let settings = { shops: [], prices: {} };
 
    ready = true;
     $('#newBtn').disabled = false;
-    $('#settingsBtn').disabled = false;
+   $('#settingsBtn').disabled = false;
+    $('#statsBtn').disabled = false;
     loadSettings();
     $('#toolbar').style.display = '';
     render();
@@ -403,6 +488,65 @@ let settings = { shops: [], prices: {} };
       btn.textContent = '🍙 ' + short + (price ? ' · ' + price + ' ₸' : '');
     });
   }
+/* ---------- СТАТИСТИКА ---------- */
+  function periodStart(period){
+    const now = new Date();
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if (period === 'today') return dayStart;
+    if (period === 'week')  return dayStart - 6  * 24 * 60 * 60 * 1000;
+    if (period === 'month') return dayStart - 29 * 24 * 60 * 60 * 1000;
+    return 0;
+  }
+
+ function renderStats(){
+    const from = periodStart(statPeriod);
+    const filtered = data.filter(z => {
+      if (z.createdAt < from) return false;
+      if (statStatus !== 'all' && z.status !== statStatus) return false;
+      return true;
+    });
+    let tuna = 0, chicken = 0, crab = 0;
+    const others = {};
+
+    filtered.forEach(z => {
+      (z.items || []).forEach(i => {
+        const name = (i.name || '').trim();
+        const qty = i.qty || 0;
+        if (!name || !qty) return;
+
+        if (name === 'Онигири с тунцом')      tuna    += qty;
+        else if (name === 'Онигири с курицей') chicken += qty;
+        else if (name === 'Онигири с крабом')  crab    += qty;
+        else others[name] = (others[name] || 0) + qty;
+      });
+    });
+
+const labels = {
+      all:  'Всего онигири',
+      new:  'Новые — всего',
+      work: 'В работе — всего',
+      done: 'Готово — всего'
+    };
+    $('#statTotalLabel').textContent = labels[statStatus] || 'Всего онигири';
+    $('#statTotal').textContent = tuna + chicken + crab;
+    $('#statTuna').textContent = tuna;
+    $('#statChicken').textContent = chicken;
+    $('#statCrab').textContent = crab;
+
+    const keys = Object.keys(others);
+    if (keys.length){
+      $('#statOthers').innerHTML =
+        '<div class="stat-others-title">Другие позиции</div>'
+        + '<div class="stat-others">' + keys.map(k =>
+            '<div class="stat-other-row"><span>' + esc(k) + '</span><b>' + others[k] + ' шт</b></div>'
+          ).join('') + '</div>';
+    } else {
+      $('#statOthers').innerHTML = '';
+    }
+  }
+
+  /* ---------- СОХРАНЕНИЕ ---------- */
+
   /* ---------- СОХРАНЕНИЕ ---------- */
   async function saveToCloud(z, isNew){
     const payload = {
@@ -649,6 +793,35 @@ let settings = { shops: [], prices: {} };
 
   /* ---------- СОБЫТИЯ ---------- */
   $('#newBtn').addEventListener('click', () => openModal());
+$('#statsBtn').addEventListener('click', () => {
+    statPeriod = 'today';
+    statStatus = 'all';
+    $$('#periodTabs .period').forEach(b => b.classList.toggle('on', b.dataset.period === 'today'));
+    $$('#statusTabs .period').forEach(b => b.classList.toggle('on', b.dataset.status === 'all'));
+    renderStats();
+    $('#statsModal').classList.add('open');
+  });  $('#closeStats').addEventListener('click', () => {
+    $('#statsModal').classList.remove('open');
+  });
+
+  $('#statsModal').addEventListener('click', e => {
+    if (e.target === $('#statsModal')) $('#statsModal').classList.remove('open');
+  });
+
+  $('#periodTabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-period]');
+    if (!btn) return;
+    statPeriod = btn.dataset.period;
+    $$('#periodTabs .period').forEach(b => b.classList.toggle('on', b === btn));
+    renderStats();
+  });
+$('#statusTabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-status]');
+    if (!btn) return;
+    statStatus = btn.dataset.status;
+    $$('#statusTabs .period').forEach(b => b.classList.toggle('on', b === btn));
+    renderStats();
+  });
 $('#settingsBtn').addEventListener('click', () => {
     $('#sShops').value = settings.shops.join('\n');
     $('#sTuna').value    = settings.prices['Онигири с тунцом']  || '';
@@ -785,10 +958,13 @@ $$('.preset').forEach(btn => {
   });
 
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && $('#modal').classList.contains('open')) closeModal();
+    if (e.key === 'Escape'){
+      if ($('#modal').classList.contains('open')) closeModal();
+      if ($('#settingsModal').classList.contains('open')) $('#settingsModal').classList.remove('open');
+      if ($('#statsModal').classList.contains('open')) $('#statsModal').classList.remove('open');
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && $('#modal').classList.contains('open')) saveFromModal();
   });
-
   /* ---------- СТАРТ ---------- */
   loadFromCloud();
 })();
