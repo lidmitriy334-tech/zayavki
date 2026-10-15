@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Заявки</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root{
+    --bg:#f4f5f8; --card:#fff; --text:#12151c; --muted:#6b7280;
+    --line:#e5e7ee; --accent:#2f6bff; --accent-soft:#eaf0ff;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:40px;
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:0 16px}
+
+  header{
+    position:sticky;top:0;z-index:20;
+    background:rgba(244,245,248,.85);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--line);
+    padding:14px 0;
+  }
+  .head-in{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .logo{
+    width:42px;height:42px;border-radius:12px;flex:none;
+    background:linear-gradient(135deg,#2f6bff,#7aa2ff);
+    color:#fff;font-weight:700;font-size:19px;
+    display:grid;place-items:center;
+  }
+  h1{font-size:17px;font-weight:650;letter-spacing:-.2px}
+  .sub{font-size:12.5px;color:var(--muted);margin-top:2px}
+
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  .primary{
+    background:var(--accent);color:#fff;font-weight:600;font-size:14px;
+    padding:10px 16px;border-radius:10px;white-space:nowrap;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .primary:active{transform:scale(.96)}
+  .primary:hover{background:#2559d8}
+  .primary:disabled{opacity:.5;pointer-events:none}
+
+  .toolbar{margin:16px 0 12px;display:flex;flex-direction:column;gap:10px}
+  .search{
+    width:100%;padding:11px 14px;border-radius:11px;
+    border:1px solid var(--line);background:var(--card);
+    font-size:14.5px;font-family:inherit;color:var(--text);
+    outline:none;transition:border-color .15s;
+  }
+  .search:focus{border-color:var(--accent)}
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{
+    padding:7px 13px;border-radius:999px;font-size:13px;font-weight:550;
+    background:var(--card);border:1px solid var(--line);color:var(--muted);
+    white-space:nowrap;transition:all .15s;
+  }
+  .tab.on{background:var(--text);color:#fff;border-color:var(--text)}
+  .tab .cnt{opacity:.55;margin-left:4px}
+
+  .card{
+    background:var(--card);border-radius:var(--radius);
+    padding:14px;margin-bottom:10px;
+    border:1px solid var(--line);
+    animation:in .22s ease;
+  }
+  @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .card-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .client{font-weight:620;font-size:15.5px;letter-spacing:-.1px}
+  .phone{font-size:13px;color:var(--muted);margin-top:3px}
+  .phone a{color:var(--muted);text-decoration:none}
+  .sum{font-weight:680;font-size:16px;white-space:nowrap;letter-spacing:-.3px}
+  .note{
+    font-size:14px;color:#3c4250;margin-top:9px;line-height:1.45;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .lines{margin-top:9px;border-top:1px dashed var(--line);padding-top:9px}
+  .line{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);padding:2px 0;gap:12px}
+  .line span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .line b{font-weight:550;color:#4b5162;white-space:nowrap}
+
+  .card-bottom{
+    display:flex;justify-content:space-between;align-items:center;
+    gap:10px;margin-top:12px;flex-wrap:wrap;
+  }
+  .chips{display:flex;gap:5px}
+  .chip{
+    font-size:12px;font-weight:560;padding:5px 10px;border-radius:8px;
+    border:1px solid var(--line);color:var(--muted);background:#fafbfd;
+    transition:all .15s;
+  }
+  .chip.on.new{background:#e8f1ff;color:#1d5fd8;border-color:#c9dcff}
+  .chip.on.work{background:#fff4e0;color:#a56100;border-color:#ffe0ab}
+  .chip.on.done{background:#e4f8ef;color:#0a7f57;border-color:#bfeede}
+  .date{font-size:11.5px;color:#9aa1ae}
+  .acts{display:flex;gap:14px;margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  .acts button{font-size:13px;color:var(--muted);font-weight:520}
+  .acts button:hover{color:var(--accent)}
+  .acts .del:hover{color:#e5484d}
+
+  .empty{text-align:center;padding:56px 20px;color:var(--muted)}
+  .empty .big{font-size:34px;margin-bottom:12px;opacity:.5}
+  .empty p{font-size:14.5px;line-height:1.5}
+
+  .modal{
+    position:fixed;inset:0;z-index:50;display:none;
+    background:rgba(12,15,22,.5);backdrop-filter:blur(3px);
+    align-items:flex-end;justify-content:center;
+  }
+  .modal.open{display:flex}
+  .sheet{
+    background:#fff;width:100%;max-width:560px;max-height:93vh;
+    border-radius:20px 20px 0 0;display:flex;flex-direction:column;
+    animation:up .25s cubic-bezier(.2,.8,.3,1);
+  }
+  @keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+  .sheet-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:16px 18px;border-bottom:1px solid var(--line);flex:none;
+  }
+  .sheet-head h2{font-size:16.5px;font-weight:640}
+  .x{font-size:18px;color:var(--muted);padding:4px 8px;border-radius:8px}
+  .x:hover{background:var(--bg)}
+  .sheet-body{padding:18px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:13px}
+  .sheet-foot{padding:14px 18px;border-top:1px solid var(--line);flex:none}
+  .sheet-foot .primary{width:100%;padding:13px}
+
+  label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  input,textarea{
+    width:100%;padding:10px 12px;border-radius:10px;font-family:inherit;
+    border:1px solid var(--line);background:#fafbfd;font-size:14.5px;
+    color:var(--text);outline:none;transition:border-color .15s, background .15s;
+  }
+  input:focus,textarea:focus{border-color:var(--accent);background:#fff}
+  textarea{resize:vertical;min-height:64px;line-height:1.45}
+
+  .items-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .items-head span{font-size:12.5px;font-weight:600;color:var(--muted)}
+  .add-item{font-size:13px;color:var(--accent);font-weight:580}
+
+  .item-row{
+    display:grid;gap:6px;padding:10px;margin-bottom:8px;
+    background:#fafbfd;border:1px solid var(--line);border-radius:11px;
+    grid-template-columns:1fr 1fr auto;
+    grid-template-areas:"name name del" "qty price sum";
+  }
+  .item-row .i-name{grid-area:name}
+  .item-row .i-qty{grid-area:qty}
+  .item-row .i-price{grid-area:price}
+  .item-row .i-del{
+    grid-area:del;font-size:14px;color:#b0b5c0;
+    width:26px;height:26px;border-radius:7px;justify-self:end;
+  }
+  .item-row .i-del:hover{background:#fdecec;color:#e5484d}
+  .item-row .i-sum{
+    grid-area:sum;align-self:center;text-align:right;
+    font-size:13.5px;font-weight:600;color:#4b5162;white-space:nowrap;
+  }
+  .total-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:12px 14px;background:var(--accent-soft);border-radius:11px;
+    font-size:14px;font-weight:600;color:#1d4ed8;
+  }
+  .total-row b{font-size:19px;letter-spacing:-.4px}
+
+  .toast{
+    position:fixed;left:50%;bottom:24px;transform:translate(-50%,80px);
+    background:#12151c;color:#fff;font-size:13.5px;font-weight:520;
+    padding:11px 18px;border-radius:11px;z-index:99;
+    opacity:0;transition:all .28s cubic-bezier(.2,.8,.3,1);pointer-events:none;
+  }
+  .toast.show{transform:translate(-50%,0);opacity:1}
+
+  .loading{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px}
+  .loading .spin{
+    width:24px;height:24px;border:2.5px solid var(--line);
+    border-top-color:var(--accent);border-radius:50%;
+    margin:0 auto 12px;animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+.presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.preset{
+  font-size:13px;font-weight:550;padding:7px 12px;border-radius:9px;
+  background:#fff5e6;color:#8a5a00;border:1px solid #ffe0ab;
+  transition:all .15s;
+}
+.preset:hover{background:#ffe9c7}
+.preset:active{transform:scale(.95)}
+.head-actions{display:flex;gap:8px;align-items:center}
+.ghost{
+  background:var(--card);color:var(--text);font-weight:600;font-size:17px;
+  padding:9px 13px;border-radius:10px;border:1px solid var(--line);
+  transition:all .15s;line-height:1;
+}
+.ghost:hover{border-color:#c9cedb}
+.ghost:active{transform:scale(.95)}
+.ghost:disabled{opacity:.5;pointer-events:none}
+
+.price-grid{display:flex;flex-direction:column;gap:8px}
+.price-grid > div{display:flex;align-items:center;gap:10px}
+.price-grid span{flex:1;font-size:14px;color:#3c4250}
+.price-grid input{width:110px;text-align:right;flex:none}
+  @media(min-width:640px){
+    .modal{align-items:center;padding:24px}
+    .sheet{border-radius:20px;max-height:88vh}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap head-in">
+    <div class="brand">
+      <div class="logo">З</div>
+      <div>
+        <h1>Заявки</h1>
+        <p class="sub" id="stat">Загрузка…</p>
+      </div>
+    </div>
+    <div class="head-actions">
+      <button class="ghost" id="settingsBtn" disabled aria-label="Настройки">⚙</button>
+      <button class="primary" id="newBtn" disabled>+ Заявка</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="toolbar" id="toolbar" style="display:none">
+    <input class="search" id="search" type="search" placeholder="Поиск по клиенту или описанию…">
+    <div class="tabs" id="tabs"></div>
+  </div>
+  <div id="list"><div class="loading"><div class="spin"></div>Подключаемся к базе…</div></div>
+</main>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="modalTitle">Новая заявка</h2>
+      <button class="x" id="closeModal" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div>
+        <label for="fClient">Магазин</label>
+        <input id="fClient" list="shopsList" placeholder="Выберите или введите">
+        <datalist id="shopsList"></datalist>
+      </div>
+      <div><label for="fPhone">Телефон</label><input id="fPhone" type="tel" placeholder="+7 ___ ___ __ __"></div>
+      <div><label for="fNote">Описание</label><textarea id="fNote" placeholder="Что нужно сделать"></textarea></div>
+      <div>
+        <div class="items-head">
+          <span>Расчёт</span>
+          <button type="button" class="add-item" id="addItem">+ позиция</button>
+        </div>
+<div class="presets">
+  <button type="button" class="preset" data-name="Онигири с тунцом">🍙 Тунец</button>
+  <button type="button" class="preset" data-name="Онигири с курицей">🍙 Курица</button>
+  <button type="button" class="preset" data-name="Онигири с крабом">🍙 Краб</button>
+</div>
+        <div id="itemRows"></div>
+        <div class="total-row"><span>Итого</span><b id="fTotal">0 ₸</b></div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="primary" id="saveBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>Магазины и цены</h2>
+      <button class="x" id="closeSettings" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div>
+        <label>Магазины (по одному в строке)</label>
+        <textarea id="sShops" style="min-height:140px" placeholder="Магазин №1&#10;Магазин №2"></textarea>
+      </div>
+      <div>
+        <label>Цены на онигири, ₸</label>
+        <div class="price-grid">
+          <div><span>🍙 Тунец</span><input id="sTuna" type="number" inputmode="decimal" min="0" placeholder="0"></div>
+          <div><span>🍙 Курица</span><input id="sChicken" type="number" inputmode="decimal" min="0" placeholder="0"></div>
+          <div><span>🍙 Краб</span><input id="sCrab" type="number" inputmode="decimal" min="0" placeholder="0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="primary" id="saveSettings">Сохранить</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ========== НАСТРОЙКИ SUPABASE ==========
+     ЗАМЕНИ ЭТИ ДВЕ СТРОКИ НА СВОИ ЗНАЧЕНИЯ! */
+  const SUPABASE_URL  = 'https://mpatdxvelgpntmdohnkv.supabase.co';
+  const SUPABASE_ANON = 'sb_publishable_ljfHZRETcee1phL5xYsaag_nrY7U9mm';
+  /* ======================================== */
+
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  const $  = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => Array.prototype.slice.call(r.querySelectorAll(s));
+
+  let data = [];
+  let filter = 'all';
+  let query = '';
+  let editingId = null;
+  let ready = false;
+let settings = { shops: [], prices: {} };
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+  const money = n => new Intl.NumberFormat('ru-RU').format(Math.round(n || 0)) + ' ₸';
+  const num = v => { const n = parseFloat(String(v).replace(',', '.')); return isNaN(n) ? 0 : n; };
+
+  function plural(n, one, few, many){
+    const a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) return many;
+    if (b > 1 && b < 5) return few;
+    if (b === 1) return one;
+    return many;
+  }
+
+  const fmtDate = ts => {
+    const d = new Date(ts);
+    return d.toLocaleDateString('ru-RU', { day:'numeric', month:'short' });
+  };
+
+  const totalOf = z => (z.items || []).reduce((s, i) => s + (i.qty || 0) * (i.price || 0), 0);
+  const STATUS = { new:'Новая', work:'В работе', done:'Готово' };
+
+  /* ---------- ЗАГРУЗКА ---------- */
+  async function loadFromCloud(){
+    const { data: rows, error } = await sb
+      .from('zayavki')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error){
+      console.error('Ошибка загрузки:', error);
+      $('#list').innerHTML = '<div class="loading">⚠️ Не удалось загрузить данные.<br>Проверьте настройки Supabase в коде.</div>';
+      $('#stat').textContent = 'Ошибка подключения';
+      return;
+    }
+
+    data = (rows || []).map(r => ({
+      id: r.id,
+      client: r.client || '',
+      phone: r.phone || '',
+      note: r.note || '',
+      items: r.items || [],
+      status: r.status || 'new',
+      createdAt: new Date(r.created_at).getTime()
+    }));
+
+   ready = true;
+    $('#newBtn').disabled = false;
+    $('#settingsBtn').disabled = false;
+    loadSettings();
+    $('#toolbar').style.display = '';
+    render();
+  }
+
+/* ---------- НАСТРОЙКИ ---------- */
+  async function loadSettings(){
+    const { data: rows, error } = await sb
+      .from('settings').select('*').eq('id', 1).single();
+    if (error){ console.warn('Настройки не загружены:', error); return; }
+    if (rows){
+      settings.shops = rows.shops || [];
+      settings.prices = rows.prices || {};
+      applySettings();
+    }
+  }
+
+  function applySettings(){
+    $('#shopsList').innerHTML = settings.shops
+      .map(s => '<option value="' + esc(s) + '"></option>').join('');
+
+    $$('.preset').forEach(btn => {
+      const name = btn.dataset.name;
+      const short = name.replace('Онигири с ', '');
+      const price = settings.prices[name];
+      btn.textContent = '🍙 ' + short + (price ? ' · ' + price + ' ₸' : '');
+    });
+  }
+  /* ---------- СОХРАНЕНИЕ ---------- */
+  async function saveToCloud(z, isNew){
+    const payload = {
+      client: z.client,
+      phone: z.phone,
+      note: z.note,
+      items: z.items,
+      status: z.status
+    };
+
+    if (isNew){
+      const { data: inserted, error } = await sb
+        .from('zayavki').insert(payload).select().single();
+
+      if (error){ console.error('Ошибка вставки:', error); toast('Не удалось сохранить'); return null; }
+
+      return {
+        id: inserted.id,
+        client: inserted.client,
+        phone: inserted.phone,
+        note: inserted.note,
+        items: inserted.items || [],
+        status: inserted.status,
+        createdAt: new Date(inserted.created_at).getTime()
+      };
+    } else {
+      const { error } = await sb.from('zayavki').update(payload).eq('id', z.id);
+      if (error){ console.error('Ошибка обновления:', error); toast('Не удалось обновить'); return null; }
+      return z;
+    }
+  }
+
+  async function deleteFromCloud(id){
+    const { error } = await sb.from('zayavki').delete().eq('id', id);
+    if (error){ console.error('Ошибка удаления:', error); toast('Не удалось удалить'); return false; }
+    return true;
+  }
+
+  /* ---------- РЕНДЕР ---------- */
+  function render(){
+    const counts = { all: data.length, new:0, work:0, done:0 };
+    let grand = 0;
+    data.forEach(z => { counts[z.status] = (counts[z.status] || 0) + 1; grand += totalOf(z); });
+
+    $('#stat').textContent = data.length + ' ' + plural(data.length,'заявка','заявки','заявок')
+      + ' · ' + money(grand);
+
+    const tabsEl = $('#tabs');
+    const tabs = [['all','Все'], ['new','Новые'], ['work','В работе'], ['done','Готово']];
+    tabsEl.innerHTML = tabs.map(([k, label]) =>
+      '<button class="tab' + (filter === k ? ' on' : '') + '" data-tab="' + k + '">'
+      + label + '<span class="cnt">' + (counts[k] || 0) + '</span></button>'
+    ).join('');
+
+    const q = query.trim().toLowerCase();
+    const list = data
+      .filter(z => filter === 'all' || z.status === filter)
+      .filter(z => {
+        if (!q) return true;
+        return ((z.client||'') + ' ' + (z.phone||'') + ' ' + (z.note||'')).toLowerCase().indexOf(q) !== -1;
+      })
+      .sort((a, b) => b.createdAt - a.createdAt);
+
+    const listEl = $('#list');
+
+    if (!list.length){
+      listEl.innerHTML =
+        '<div class="empty"><div class="big">' + (data.length ? '🔍' : '📋') + '</div>'
+        + '<p>' + (data.length
+            ? 'Ничего не найдено.<br>Попробуйте изменить фильтр или запрос.'
+            : 'Пока пусто.<br>Нажмите «+ Заявка», чтобы добавить первую.')
+        + '</p></div>';
+      return;
+    }
+
+    listEl.innerHTML = list.map(z => {
+      const sum = totalOf(z);
+      const lines = (z.items || []).filter(i => i.name || i.price);
+      const linesHtml = lines.length
+        ? '<div class="lines">' + lines.map(i =>
+            '<div class="line"><span>' + esc(i.name || 'Позиция')
+            + (i.qty !== 1 ? ' × ' + i.qty : '') + '</span>'
+            + '<b>' + money((i.qty||0) * (i.price||0)) + '</b></div>'
+          ).join('') + '</div>'
+        : '';
+
+      return '<article class="card" data-id="' + z.id + '">'
+        + '<div class="card-top">'
+          + '<div>'
+            + '<div class="client">' + (esc(z.client) || 'Без имени') + '</div>'
+            + (z.phone ? '<div class="phone"><a href="tel:' + esc(z.phone) + '">' + esc(z.phone) + '</a></div>' : '')
+          + '</div>'
+          + '<div class="sum">' + money(sum) + '</div>'
+        + '</div>'
+        + (z.note ? '<p class="note">' + esc(z.note) + '</p>' : '')
+        + linesHtml
+        + '<div class="card-bottom">'
+          + '<div class="chips">' + Object.keys(STATUS).map(k =>
+              '<button class="chip' + (z.status === k ? ' on ' + k : '') + '" data-status="' + k + '">'
+              + STATUS[k] + '</button>'
+            ).join('') + '</div>'
+          + '<div class="date">' + fmtDate(z.createdAt) + '</div>'
+        + '</div>'
+        + '<div class="acts">'
+          + '<button data-act="edit">Изменить</button>'
+          + '<button data-act="export">CSV</button>'
+          + '<button class="del" data-act="del">Удалить</button>'
+        + '</div>'
+      + '</article>';
+    }).join('');
+  }
+
+  /* ---------- МОДАЛКА ---------- */
+  function addItemRow(name, qty, price){
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML =
+      '<input class="i-name" placeholder="Название" value="' + esc(name || '') + '">'
+      + '<input class="i-qty" type="number" inputmode="decimal" min="0" step="any" placeholder="1" value="' + (qty != null ? qty : '') + '">'
+      + '<input class="i-price" type="number" inputmode="decimal" min="0" step="any" placeholder="0" value="' + (price != null ? price : '') + '">'
+      + '<div class="i-sum">0 ₸</div>'
+      + '<button type="button" class="i-del" aria-label="Удалить позицию">✕</button>';
+    $('#itemRows').appendChild(row);
+    recalc();
+  }
+
+  function recalc(){
+    let total = 0;
+    $$('#itemRows .item-row').forEach(row => {
+      const s = num($('.i-qty', row).value) * num($('.i-price', row).value);
+      total += s;
+      $('.i-sum', row).textContent = money(s);
+    });
+    $('#fTotal').textContent = money(total);
+    return total;
+  }
+
+  function openModal(id){
+    if (!ready) return;
+    editingId = id || null;
+    $('#modalTitle').textContent = id ? 'Редактировать заявку' : 'Новая заявка';
+    $('#itemRows').innerHTML = '';
+
+    if (id){
+      const z = data.find(x => x.id === id);
+      if (!z) return;
+      $('#fClient').value = z.client || '';
+      $('#fPhone').value  = z.phone  || '';
+      $('#fNote').value   = z.note   || '';
+      if (z.items && z.items.length) z.items.forEach(i => addItemRow(i.name, i.qty, i.price));
+      else addItemRow();
+    } else {
+      $('#fClient').value = '';
+      $('#fPhone').value  = '';
+      $('#fNote').value   = '';
+      addItemRow();
+    }
+    recalc();
+    $('#modal').classList.add('open');
+    if (!id) setTimeout(() => $('#fClient').focus(), 120);
+  }
+
+  function closeModal(){
+    $('#modal').classList.remove('open');
+    editingId = null;
+  }
+
+  async function saveFromModal(){
+    const client = $('#fClient').value.trim();
+    const phone  = $('#fPhone').value.trim();
+    const note   = $('#fNote').value.trim();
+
+    const items = $$('#itemRows .item-row').map(row => ({
+      name:  $('.i-name', row).value.trim(),
+      qty:   num($('.i-qty', row).value) || 1,
+      price: num($('.i-price', row).value)
+    })).filter(i => i.name || i.price);
+
+    if (!client && !phone && !note && !items.length){
+      toast('Заполните хотя бы одно поле');
+      return;
+    }
+
+    const btn = $('#saveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Сохраняем…';
+
+    const isNew = !editingId;
+
+    if (isNew){
+      const saved = await saveToCloud({ client, phone, note, items, status: 'new' }, true);
+      if (saved){ data.push(saved); toast('Заявка добавлена'); }
+    } else {
+      const z = data.find(x => x.id === editingId);
+      const saved = await saveToCloud({ ...z, client, phone, note, items }, false);
+      if (saved){ Object.assign(z, { client, phone, note, items }); toast('Заявка обновлена'); }
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Сохранить';
+    render();
+    closeModal();
+  }
+
+  /* ---------- CSV ---------- */
+  function exportCsv(z){
+    const rows = [['Дата','Клиент','Телефон','Описание','Позиция','Кол-во','Цена','Сумма']];
+    const items = (z.items && z.items.length) ? z.items : [{ name:'', qty:'', price:'' }];
+    items.forEach((i, idx) => {
+      rows.push([
+        idx === 0 ? new Date(z.createdAt).toLocaleDateString('ru-RU') : '',
+        idx === 0 ? z.client : '',
+        idx === 0 ? z.phone : '',
+        idx === 0 ? z.note : '',
+        i.name, i.qty, i.price, i.qty && i.price ? i.qty * i.price : ''
+      ]);
+    });
+    rows.push(['', '', '', '', '', '', 'ИТОГО', totalOf(z)]);
+
+    const csv = '\ufeff' + rows.map(r =>
+      r.map(c => '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"').join(';')
+    ).join('\r\n');
+
+    const name = 'заявка-' + (z.client || 'без-имени').replace(/[^\wа-яё\-]/gi, '_') + '.csv';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('CSV сохранён');
+  }
+
+  /* ---------- ТОСТ ---------- */
+  let toastTimer;
+  function toast(msg){
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  /* ---------- СОБЫТИЯ ---------- */
+  $('#newBtn').addEventListener('click', () => openModal());
+$('#settingsBtn').addEventListener('click', () => {
+    $('#sShops').value = settings.shops.join('\n');
+    $('#sTuna').value    = settings.prices['Онигири с тунцом']  || '';
+    $('#sChicken').value = settings.prices['Онигири с курицей'] || '';
+    $('#sCrab').value    = settings.prices['Онигири с крабом']  || '';
+    $('#settingsModal').classList.add('open');
+  });
+
+  $('#closeSettings').addEventListener('click', () => {
+    $('#settingsModal').classList.remove('open');
+  });
+
+  $('#settingsModal').addEventListener('click', e => {
+    if (e.target === $('#settingsModal')) $('#settingsModal').classList.remove('open');
+  });
+
+  $('#saveSettings').addEventListener('click', async () => {
+    const shops = $('#sShops').value.split('\n').map(s => s.trim()).filter(Boolean);
+    const prices = {
+      'Онигири с тунцом':  num($('#sTuna').value),
+      'Онигири с курицей': num($('#sChicken').value),
+      'Онигири с крабом':  num($('#sCrab').value)
+    };
+
+    const btn = $('#saveSettings');
+    btn.disabled = true; btn.textContent = 'Сохраняем…';
+
+    const { error } = await sb.from('settings').update({ shops, prices }).eq('id', 1);
+
+    btn.disabled = false; btn.textContent = 'Сохранить';
+
+    if (error){
+      console.error('Ошибка сохранения настроек:', error);
+      toast('Не удалось сохранить');
+      return;
+    }
+
+    settings.shops = shops;
+    settings.prices = prices;
+    applySettings();
+    toast('Настройки сохранены');
+    $('#settingsModal').classList.remove('open');
+  });
+  $('#closeModal').addEventListener('click', closeModal);
+  $('#saveBtn').addEventListener('click', saveFromModal);
+  $('#addItem').addEventListener('click', () => {
+    addItemRow();
+    const rows = $$('#itemRows .item-row');
+    const last = rows[rows.length - 1];
+    if (last) $('.i-name', last).focus();
+  });
+
+  $('#modal').addEventListener('click', e => {
+    if (e.target === $('#modal')) closeModal();
+  });
+$$('.preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const name = btn.dataset.name;
+      const price = settings.prices[name] || '';
+      const rows = $$('#itemRows .item-row');
+      const emptyRow = rows.find(r =>
+        !$('.i-name', r).value.trim() &&
+        !$('.i-price', r).value &&
+        !$('.i-qty', r).value
+      );
+      if (emptyRow){
+        $('.i-name', emptyRow).value = name;
+        $('.i-qty', emptyRow).value = 1;
+        $('.i-price', emptyRow).value = price;
+        recalc();
+        $('.i-qty', emptyRow).focus();
+      } else {
+        addItemRow(name, 1, price);
+        const newRows = $$('#itemRows .item-row');
+        $('.i-qty', newRows[newRows.length - 1]).focus();
+      }
+    });
+  });  $('#itemRows').addEventListener('input', recalc);
+
+  $('#itemRows').addEventListener('click', e => {
+    if (e.target.classList.contains('i-del')){
+      const rows = $$('#itemRows .item-row');
+      if (rows.length === 1){
+        $('.i-name', rows[0]).value = '';
+        $('.i-qty', rows[0]).value = '';
+        $('.i-price', rows[0]).value = '';
+        recalc();
+      } else {
+        e.target.closest('.item-row').remove();
+        recalc();
+      }
+    }
+  });
+
+  $('#search').addEventListener('input', e => { query = e.target.value; render(); });
+
+  $('#tabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    filter = btn.dataset.tab;
+    render();
+  });
+
+  $('#list').addEventListener('click', async e => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const id = parseInt(card.dataset.id);
+    const z = data.find(x => x.id === id);
+    if (!z) return;
+
+    const chip = e.target.closest('[data-status]');
+    if (chip){
+      z.status = chip.dataset.status;
+      render();
+      await saveToCloud(z, false);
+      return;
+    }
+
+    const act = e.target.closest('[data-act]');
+    if (!act) return;
+
+    if (act.dataset.act === 'edit') openModal(id);
+    else if (act.dataset.act === 'export') exportCsv(z);
+    else if (act.dataset.act === 'del'){
+      if (confirm('Удалить заявку «' + (z.client || 'без имени') + '»?')){
+        const ok = await deleteFromCloud(id);
+        if (ok){
+          data = data.filter(x => x.id !== id);
+          render();
+          toast('Заявка удалена');
+        }
+      }
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('#modal').classList.contains('open')) closeModal();
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && $('#modal').classList.contains('open')) saveFromModal();
+  });
+
+  /* ---------- СТАРТ ---------- */
+  loadFromCloud();
+})();
+</script>
+</body>
+</html>
